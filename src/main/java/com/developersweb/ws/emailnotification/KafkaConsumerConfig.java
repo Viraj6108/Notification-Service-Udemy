@@ -23,6 +23,7 @@ import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.web.client.RestTemplate;
 
 import com.developersweb.ws.emailnotification.errors.NotRetryableException;
 import com.developersweb.ws.emailnotification.errors.RetryableExceptions;
@@ -45,7 +46,7 @@ public class KafkaConsumerConfig {
 		config.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
 		config.put(JsonDeserializer.TRUSTED_PACKAGES,
 				environment.getProperty("spring.kafka.consumer.properties.spring.json.trusted.packages"));
-		config.put(ConsumerConfig.GROUP_ID_CONFIG, environment.getProperty("spring.kafka.consumer.group-id"));
+		config.put(ConsumerConfig.GROUP_ID_CONFIG, environment.getProperty("consumer.group-id"));
 
 		return new DefaultKafkaConsumerFactory<>(config);
 	}
@@ -53,10 +54,9 @@ public class KafkaConsumerConfig {
 	@Bean
 	ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
 			ConsumerFactory<String, Object> consumerFactory, KafkaTemplate<String, Object> kafkaTemplate) {
-		DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate 
-				,(record,ex)->new org.apache.kafka.common.TopicPartition(record.topic()+".DLT",record.partition()));
+		DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
 		DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer,
-				new FixedBackOff(5000,3));
+				new FixedBackOff(5000L,3));
 		
 		errorHandler.addNotRetryableExceptions(NotRetryableException.class);
 		errorHandler.addRetryableExceptions(RetryableExceptions.class);
@@ -81,5 +81,11 @@ public class KafkaConsumerConfig {
 		config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 		
 		return new DefaultKafkaProducerFactory<>(config);
+	}
+	
+	@Bean
+	RestTemplate resetTemplate()
+	{
+		return new RestTemplate();
 	}
 }
